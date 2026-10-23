@@ -1,0 +1,29 @@
+{
+  "artifacts": [
+    {
+      "name": "python.3.12.10.nupkg",
+      "source": "https://api.nuget.org/v3-flatcontainer/python/3.12.10/python.3.12.10.nupkg",
+      "sha256": "0eb85c2dfccccf1b17352de4c397f69194035b7d37149eacc16f1147d93de3b8",
+      "sha512_base64": "u9pNz2iKlCEbYtUJaKkbOPMF0LjR7NkCafdKhvigpPzrt8oWKgdTpHaR6z3wyWQAm9PYGUxv0Zr66NX9AeHMDw==",
+      "source_sha512_verified": true
+    },
+    {
+      "name": "numpy-2.2.6-cp312-cp312-win_amd64.whl",
+      "source": "https://pypi.org",
+      "sha256": "c1f9540be57940698ed329904db803cf7a402f3fc200bfe599334c9bd84a40b2",
+      "wheel_record_files_verified": 895
+    },
+    {
+      "name": "opencv_python_headless-4.11.0.86-cp37-abi3-win_amd64.whl",
+      "source": "https://pypi.org",
+      "sha256": "6c304df9caa7a6a5710b91709dd4786bf20a74d57672b3c31f7033cc638174ca",
+      "wheel_record_files_verified": 85
+    },
+    {
+      "name": "pillow-11.2.1-cp312-cp312-win_amd64.whl",
+      "source": "https://pypi.org",
+      "sha256": "14e33b28bf17c7a38eede290f77db7c664e4eb01f7869e37fa98a5aa95978941",
+      "wheel_record_files_verified": 117
+    }
+  ]
+}

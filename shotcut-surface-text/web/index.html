@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>表面贴字 · Shotcut</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><div class="brand"><span class="brand-icon">▱</span><div>表面贴字<small>SURFACE TEXT / SHOTCUT</small></div></div><span class="local"><i></i> 本机处理 · 无需联网</span></header>
+<main>
+<section class="intro"><div><span class="eyebrow">让文字成为画面的一部分</span><h1>贴上透视，跟住表面。</h1><p>选择物体同一平面的四个角，让字幕随镜头保持投影关系。</p></div><button id="choose" class="secondary">＋ 打开本地视频</button><input type="file" id="file" accept=".mp4,.mov,.mkv,.avi,.m4v,.webm" hidden></section>
+<div class="workspace">
+<section class="viewer-panel">
+<div class="panel-head"><span id="filename">尚未打开视频</span><span id="resolution">选清晰的一帧作为起点</span></div>
+<div class="stage" id="dropzone">
+<div id="empty"><span class="empty-icon">▱</span><h2>从一个平面开始</h2><p>把视频拖到这里，或点击“打开本地视频”<br>适合灯箱、屏幕、包装盒的单个平面</p></div>
+<canvas id="canvas" hidden aria-label="按左上、右上、右下、左下顺序选择表面四角"></canvas>
+<span id="frame-status" hidden></span>
+</div>
+<div class="transport"><button id="previous" disabled title="前一帧">←</button><button id="play" disabled>逐帧播放</button><button id="next" disabled title="后一帧">→</button><span id="time">0.000 s</span><label class="preview-label"><input id="preview" type="checkbox" disabled> 预览字幕</label></div>
+<div class="scrubber"><input id="timeline" type="range" min="0" max="0" value="0" disabled><label>帧 <input id="frame-number" type="number" min="0" value="0" disabled></label></div>
+<div class="selection-bar"><div><strong id="selection-help">① 左上 → ② 右上 → ③ 右下 → ④ 左下</strong><small>选表面四角，包含边缘；不要只框一行已有文字。</small></div><button id="undo-point" disabled>撤销一角</button><button id="clear-points" disabled>重选</button></div>
+<div class="anchor-heading"><h3>参考帧与修正点 <span id="anchor-count">0</span></h3><button id="add-anchor" disabled>＋ 保存当前四角</button></div>
+<div id="anchors" class="anchors"><p class="muted">保存第一个参考帧后，开始自动跟踪。丢失后可在清晰帧添加修正点。</p></div>
+</section>
+<aside>
+<section class="card"><span class="step">01 / 字幕样式</span><h2>写在表面上</h2><label class="field">字幕内容<textarea id="text" rows="3" maxlength="2000">透视贴合 · 自动跟随</textarea></label>
+<div class="two-fields"><label class="field">文字颜色<input id="color" type="color" value="#202020"></label><label class="field">字号 / 表面高度 %<input id="size" type="number" min="3" max="60" value="18"></label></div>
+<label class="field">垂直位置 <span id="vertical-value">65%</span><input id="vertical" type="range" min="0" max="100" value="65"></label>
+<label class="field">表面宽高比 <span class="muted">留空自动估计</span><input id="aspect" type="number" min="0.2" max="12" step="0.05" placeholder="自动"></label><p class="footnote">同一平面的透视可精确投影；文字的视觉比例可用宽高比微调。</p></section>
+<section class="card"><span class="step">02 / 平面跟踪</span><h2>把后续交给跟踪</h2><p class="muted">从最早参考帧向后分析。置信度不足时隐藏字幕，等待你的修正点。</p><button id="track" class="primary" disabled>开始自动跟踪</button><progress id="progress" max="1" value="0" hidden></progress><button id="cancel" class="quiet" hidden>取消分析</button><p id="tracking-status" class="status">先打开视频，再保存四角参考帧。</p></section>
+<section class="card export-card"><span class="step">03 / 回到 Shotcut</span><button id="export" class="primary" disabled>下载可编辑 Shotcut 工程 ↓</button><button id="copy" class="secondary full" disabled>复制跟踪数据</button><p class="footnote">工程含原视频、原声和独立透明字幕轨道。请先安装随包 SurfacePin 滤镜。改文字需在此重新生成，四角关键帧可在 Shotcut 编辑。</p></section>
+</aside>
+</div>
+<footer><span>SurfacePin · 本地平面跟踪与真实投影滤镜</span><span>适合单一平面；不包含曲面贴图、自动去字或前景遮挡分割。</span></footer>
+</main><div id="toast" role="status" hidden></div><script src="/app.js"></script>
+</body></html>

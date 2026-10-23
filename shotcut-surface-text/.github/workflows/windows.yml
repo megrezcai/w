@@ -1,0 +1,24 @@
+name: Windows native and tracking checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - run: node tests/test-importer.cjs
+      - name: Check shipped runtime imports
+        shell: cmd
+        run: runtime\python.exe -E -s -c "import numpy, cv2, PIL; from surface_text import server; print(numpy.__version__, cv2.__version__, PIL.__version__)"

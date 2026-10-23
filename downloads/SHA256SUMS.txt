@@ -1,0 +1,3 @@
+4b50a16813ac1ba3940e4e0904fe57c69e815be99fc054b24ba6a3cb1375c5ec  shotcut-surface-text-windows-x64.zip
+0a3facbe0c413d63e649847b5ed4eb673655bec73390fac9419ef3fb22668d2d  shotcut-surface-text-sources.zip
+ef04fb1e639b288973e2fd05b79497db97920345ab070b2cc36db314200262c3  surface-text-example.zip
