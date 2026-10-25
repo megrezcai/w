@@ -1,5 +1,6 @@
 """Start the Windows packaged executable and verify bundled assets + API."""
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -28,6 +29,12 @@ with tempfile.TemporaryDirectory() as temp:
             with opener.open('http://127.0.0.1:18765/app.js') as r:assert b'/api/sessions' in r.read()
             print('Windows executable smoke test passed')
         finally:
-            process.terminate()
+            # A PyInstaller one-file exe has a bootloader parent and an app child.
+            # Stop the entire test-owned process tree before removing its log/data.
+            if os.name == 'nt':
+                subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            else:
+                process.terminate()
             try:process.wait(timeout=10)
             except subprocess.TimeoutExpired:process.kill();process.wait()
