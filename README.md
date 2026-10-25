@@ -1,5 +1,7 @@
 # 星伴 Xingban
 
+> 新增 **[CaseForge：Windows 本地审问与谈判 NPC，下载与使用说明](caseforge/README.md)**。
+
 > 本仓库另含 **[Shotcut 表面贴字插件：效果预览、Windows 下载和使用说明](shotcut-surface-text/START-HERE.md)**。
 
 一个面向 Windows 的 AI 女友桌面应用原型。支持中文聊天、自定义成年角色、主动收藏的长期记忆、本地聊天记录、JSON 导出、互动快捷动作和系统语音朗读。没有密钥时为明确标注的规则演示，并非真正的模型对话。
