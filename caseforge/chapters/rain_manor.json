@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "id": "rain_manor",
+  "title": "雨夜庄园 · 管家的条件",
+  "public_brief": "庄园主人在暴雨夜死于书房。你正在询问管家周衡。你持有走廊监控、值班簿和一封截获信。证据与承诺需由游戏系统实际出示；口头诈唬不会变成实证。",
+  "evidence": [
+    {
+      "id": "camera",
+      "title": "走廊监控",
+      "description": "22:10 的画面显示周衡离开厨房，走向书房方向。",
+      "effects": [
+        {
+          "character": "butler",
+          "leverage": 3.5,
+          "betrayal": 0
+        }
+      ]
+    },
+    {
+      "id": "register",
+      "title": "值班簿",
+      "description": "值班簿证明当晚厨房由帮厨独自值守。",
+      "effects": [
+        {
+          "character": "butler",
+          "leverage": 2,
+          "betrayal": 0
+        }
+      ]
+    },
+    {
+      "id": "letter",
+      "title": "截获信",
+      "description": "继承人写给律师的信中，试图让周衡承担清理现场的全部责任。",
+      "effects": [
+        {
+          "character": "butler",
+          "leverage": 2.5,
+          "betrayal": 0.9
+        }
+      ]
+    }
+  ],
+  "offers": [
+    {
+      "id": "protect_family",
+      "title": "安排妹妹的安全住处",
+      "description": "玩家有能力安排周衡妹妹的安全住处，并明确承诺会去做。",
+      "benefits": [
+        {
+          "character": "butler",
+          "interest": "family",
+          "value": 1
+        }
+      ],
+      "counter_line": "先答应替我妹妹安排安全的住处。她不该被卷进来。"
+    },
+    {
+      "id": "record_cooperation",
+      "title": "如实记录主动配合",
+      "description": "玩家承诺在调查报告中如实记录周衡主动配合，不承诺免罪。",
+      "benefits": [
+        {
+          "character": "butler",
+          "interest": "self",
+          "value": 0.7
+        }
+      ],
+      "counter_line": "你能把我主动配合的事如实写进报告吗？"
+    },
+    {
+      "id": "frame_sister",
+      "title": "让妹妹代为承担责任（触碰底线）",
+      "description": "玩家提议让周衡妹妹承担责任来换取他的脱身。",
+      "benefits": [
+        {
+          "character": "butler",
+          "interest": "self",
+          "value": 1
+        },
+        {
+          "character": "butler",
+          "interest": "family",
+          "value": -1
+        }
+      ],
+      "counter_line": "别把责任推给我妹妹。"
+    }
+  ],
+  "characters": [
+    {
+      "id": "butler",
+      "name": "周衡 · 管家",
+      "persona": "四十多岁的庄园管家，措辞克制，观察力强，习惯先问清对方掌握了什么。对熟人讲情面，但面对空泛承诺会追问。",
+      "public_knowledge": [
+        "当晚下过暴雨。",
+        "我在庄园工作多年，认识庄园里的常住者。"
+      ],
+      "interests": [
+        {
+          "id": "family",
+          "label": "家人安全",
+          "weight": 5
+        },
+        {
+          "id": "self",
+          "label": "减轻自身责任",
+          "weight": 3
+        },
+        {
+          "id": "loyalty",
+          "label": "维护雇主关系",
+          "weight": 1
+        }
+      ],
+      "initial_trust": 0.25,
+      "red_lines": [
+        "frame_sister"
+      ],
+      "secrets": [
+        {
+          "id": "corridor",
+          "topic": "离开厨房与走廊行踪",
+          "hints": [
+            "厨房",
+            "走廊",
+            "十点",
+            "22:10",
+            "行踪",
+            "离开"
+          ],
+          "truth": "我在22:10离开过厨房，去过书房外的走廊。",
+          "denial": "十点以后，我一直待在厨房。",
+          "cost": 1.6,
+          "requires": [],
+          "evidence": [
+            "camera",
+            "register"
+          ],
+          "requires_offers": []
+        },
+        {
+          "id": "visitor",
+          "topic": "书房门口见到的人",
+          "hints": [
+            "看见谁",
+            "见到谁",
+            "继承人",
+            "谁进了书房",
+            "门口"
+          ],
+          "truth": "我看见继承人陆承从书房出来，袖口上沾着红色墨迹。",
+          "denial": "我没看见有人从书房出来。",
+          "cost": 4.4,
+          "requires": [
+            "corridor"
+          ],
+          "evidence": [
+            "letter"
+          ],
+          "requires_offers": [
+            "protect_family"
+          ]
+        },
+        {
+          "id": "weapon",
+          "topic": "清理现场和藏起的物品",
+          "hints": [
+            "凶器",
+            "藏在哪",
+            "藏在哪里",
+            "清理",
+            "物品",
+            "东西在哪"
+          ],
+          "truth": "我把那柄黄铜拆信刀藏在温室第三排花架下的工具箱里。",
+          "denial": "我不知道你说的东西在哪里。",
+          "cost": 6.5,
+          "requires": [
+            "visitor"
+          ],
+          "evidence": [
+            "letter"
+          ],
+          "requires_offers": [
+            "protect_family",
+            "record_cooperation"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+name: CaseForge Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/caseforge-*']
+    paths: ['caseforge/**', '.github/workflows/caseforge-windows.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test negotiation rules and local APIs
+        working-directory: caseforge
+        run: python -m unittest discover -s tests -v
+      - name: Install executable builder
+        run: python -m pip install pyinstaller==6.16.0
+      - name: Build Windows portable package
+        working-directory: caseforge
+        run: python build_windows.py
+      - name: Verify packaged executable and bundled resources
+        working-directory: caseforge
+        run: python tests/smoke_exe.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CaseForge-Windows-x64
+          path: caseforge/dist/CaseForge-Windows-x64.zip
+      - name: Publish requested Windows download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CASEFORGE_COMMIT: ${{ github.sha }}
+        shell: pwsh
+        run: |
+          $tag = 'caseforge-v0.1.0'
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target $env:CASEFORGE_COMMIT --title 'CaseForge v0.1.0 - local interrogation NPC' --notes 'Windows portable build. Install Ollama, extract the complete ZIP, run SETUP-MODEL.cmd once, then START.cmd. Base model weights are downloaded separately. This configures Qwen3; it is not newly trained model weights.'
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          gh release upload $tag caseforge/dist/CaseForge-Windows-x64.zip --clobber
+          exit $LASTEXITCODE
