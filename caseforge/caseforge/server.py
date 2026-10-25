@@ -1,5 +1,6 @@
 """Loopback authoring console and game API; SQLite saves chapter snapshots per session."""
 import copy
+from contextlib import closing
 import json
 import secrets
 import sqlite3
@@ -18,7 +19,7 @@ class App:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         (self.data_dir / 'chapters').mkdir(exist_ok=True)
         self.db = self.data_dir / 'sessions.sqlite3'
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             conn.execute('CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, chapter TEXT NOT NULL, state TEXT NOT NULL, debug TEXT NOT NULL)')
         self.demo, self.strict, self.model_name, self.base = demo, strict, model, base
         self.token = secrets.token_urlsafe(32)
@@ -45,14 +46,14 @@ class App:
         return result
 
     def read(self, sid):
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             row = conn.execute('SELECT chapter,state,debug FROM sessions WHERE id=?', (sid,)).fetchone()
         if row is None:
             raise KeyError('会话不存在')
         return tuple(json.loads(x) for x in row)
 
     def write(self, sid, chapter, state, debug):
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             conn.execute('INSERT OR REPLACE INTO sessions VALUES (?,?,?,?)', (sid, *[json.dumps(x, ensure_ascii=False) for x in [chapter, state, debug]]))
 
     def view(self, chapter, state):
