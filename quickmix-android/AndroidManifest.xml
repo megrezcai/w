@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.quickmix.mobile" android:versionCode="1" android:versionName="1.0.0">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.quickmix.mobile" android:versionCode="2" android:versionName="1.1.0">
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="34"/>
     <application android:label="声场 QuickMix" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:icon="@drawable/ic_quickmix">
         <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden">

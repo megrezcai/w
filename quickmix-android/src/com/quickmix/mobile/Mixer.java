@@ -39,27 +39,29 @@ final class Mixer {
             x2=x1; x1=x; y2=y1; y1=y;
             return y;
         }
-        double blendedMagnitude(double hz, double rate, double mix) {
+        void response(double hz, double rate, double[] result) {
             double w=2*Math.PI*hz/rate, c=Math.cos(w), s=Math.sin(w);
             double nr=b0+b1*c+b2*Math.cos(2*w), ni=b1*s+b2*Math.sin(2*w);
             double dr=1+a1*c+a2*Math.cos(2*w), di=a1*s+a2*Math.sin(2*w);
-            nr=nr*mix+dr*(1-mix);
-            ni=ni*mix+di*(1-mix);
-            return Math.sqrt((nr*nr+ni*ni)/(dr*dr+di*di));
+            double denominator=dr*dr+di*di;
+            result[0]=(nr*dr+ni*di)/denominator;
+            result[1]=(ni*dr-nr*di)/denominator;
         }
     }
 
     private final int rate;
     private final Lane[] lanes;
     private final double[] bandPower = new double[6], dynamicCut = new double[6];
-    private double fast, slow, floor=0.0001, comp=1, level=1, limiter=1;
+    private final float[] dynamicDb=new float[6];
+    private final double rmsStep, turnDownStep, turnUpStep;
+    private double fast, slow, floor=0.0001, comp=1, level=1, levelPower, levelTarget=1, limiter=1;
     private double attack, release, trim;
     private Settings settings;
     private int counter;
 
     private static final class Lane {
         final Filter low = new Filter(), presence = new Filter();
-        final Filter[] eq = new Filter[6], detector = new Filter[6];
+        final Filter[] eq = new Filter[6], detector = new Filter[6], dynamicBand = new Filter[6];
         final float[][] echo = new float[6][];
         final int[] cursor = new int[6];
         Lane(int rate) {
@@ -68,6 +70,7 @@ final class Mixer {
             for (int i=0;i<6;i++) {
                 eq[i]=new Filter();
                 detector[i]=new Filter();
+                dynamicBand[i]=new Filter();
                 echo[i]=new float[Math.max(1,rate*(31+i*8)/1000)];
             }
         }
@@ -75,12 +78,17 @@ final class Mixer {
 
     Mixer(int rate, int channels) {
         this.rate=rate;
+        rmsStep=1-coefficient(90);
+        turnDownStep=1-coefficient(85);
+        turnUpStep=1-coefficient(260);
         lanes=new Lane[channels];
         Arrays.setAll(lanes,i -> new Lane(rate));
     }
     private double coefficient(double ms) { return Math.exp(-1000/(rate*ms)); }
-    private static double amp(double db) { return Math.pow(10,db/20); }
+    static double amp(double db) { return Math.pow(10,db/20); }
     private static double clamp(double x,double min,double max) { return Math.max(min,Math.min(max,x)); }
+
+    float[] dynamicGains() { return dynamicDb.clone(); }
 
     void process(float[] pcm, int count, Settings active) {
         final float[] p=active.values;
@@ -89,30 +97,44 @@ final class Mixer {
             attack=coefficient(p[6]); release=coefficient(p[7]); trim=amp(p[8]);
             for (Lane lane:lanes) {
                 lane.presence.tune(0,3200,5*p[2],rate);
-                for (int i=0;i<6;i++) lane.detector[i].tune(3,p[10+i*6],0,rate);
+                for (int i=0;i<6;i++) {
+                    lane.detector[i].tune(3,p[10+i*6],0,rate);
+                    lane.dynamicBand[i].tune(3,p[10+i*6],0,rate);
+                }
             }
             counter=0;
         }
         for (int frame=0;frame<count;frame+=lanes.length) {
             double peak=0;
-            for (int c=0;c<lanes.length;c++) peak=Math.max(peak,Math.abs(pcm[frame+c]));
+            double inputPower=0;
+            for (int c=0;c<lanes.length;c++) {
+                double sample=pcm[frame+c];
+                peak=Math.max(peak,Math.abs(sample));
+                inputPower+=sample*sample;
+            }
             fast+=(peak-fast)*(peak>fast ? .012 : .002);
             slow+=(fast-slow)*.0002;
             floor+=(fast-floor)*(fast<floor ? .004 : .000008);
             double gate=clamp((fast-(floor*1.5+0.001))/(floor*2+0.008),0,1);
             double decay=clamp((slow-fast)/(slow+0.002),0,1);
             double setup=(1-p[0]*.92*(1-gate))*(1-p[1]*.83*decay);
+            levelPower+=(inputPower/lanes.length*setup*setup-levelPower)*rmsStep;
             if (counter++%64==0) {
-                double target=clamp(.15/(slow+.0001),.45,2.5);
-                if (slow>.008 && gate>.45) level+=(target-level)*.014;
+                double rmsDb=10*Math.log10(levelPower+1e-12);
+                double voiced=clamp((rmsDb+53)/13,0,1);
+                double correction=clamp((-22-rmsDb)*.65,-9,9);
+                if (correction>0) correction*=voiced;
+                levelTarget=amp(correction*p[3]);
                 for (int b=0;b<6;b++) {
                     int k=10+b*6;
                     double db=10*Math.log10(bandPower[b]+1e-12);
                     double dyn=p[k+4]*clamp((db-p[k+3])/18,0,1);
+                    dynamicDb[b]=(float)dyn;
                     dynamicCut[b]=amp(dyn)-1;
                     for (Lane lane:lanes) lane.eq[b].tune((int)p[k+5],p[k],p[k+1]+dyn,rate);
                 }
             }
+            level+=(levelTarget-level)*(levelTarget<level?turnDownStep:turnUpStep);
             for (int i=0;i<6;i++) {
                 double power=0;
                 for (int c=0;c<lanes.length;c++) {
@@ -125,7 +147,7 @@ final class Mixer {
             for (int c=0;c<lanes.length;c++) {
                 Lane lane=lanes[c];
                 double x=pcm[frame+c];
-                x=lane.presence.tick((x+(lane.low.tick(x)-x)*p[0])*setup)*(1+p[3]*(level-1));
+                x=lane.presence.tick((x+(lane.low.tick(x)-x)*p[0])*setup)*(p[3]==0?1:level);
                 double wet=0;
                 for (int i=0;i<6;i++) {
                     int k=10+i*6;
@@ -133,9 +155,9 @@ final class Mixer {
                     x=lane.eq[i].tick(x);
                     if (p[k+5]!=0) {
                         double blend=clamp((p[k+1]+18)/36,0,1);
-                        // Vertical dragging sets the amount of cut in shelf modes.
+                        // Vertical dragging sets the wet mix in pass-filter modes.
                         x=dry+(x-dry)*blend;
-                        x+=lane.detector[i].y1*dynamicCut[i];
+                        x+=lane.dynamicBand[i].tick(dry)*dynamicCut[i];
                     }
                     int slot=lane.cursor[i];
                     float delayed=lane.echo[i][slot];

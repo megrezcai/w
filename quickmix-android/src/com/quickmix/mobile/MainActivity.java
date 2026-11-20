@@ -24,7 +24,16 @@ public final class MainActivity extends Activity {
     Mixer.Settings edit=live.copy();
     Mixer.Settings exportSettings;
     AudioFile exportAudio, audio;
-    volatile float[] spectrum=new float[0];
+    static final class EqFrame {
+        final Mixer.Settings settings;
+        final float[] bins, gains;
+        final boolean original;
+        EqFrame(Mixer.Settings settings,float[] bins,float[] gains,boolean original) {
+            this.settings=settings; this.bins=bins; this.gains=gains; this.original=original;
+        }
+    }
+    volatile EqFrame eqFrame;
+    volatile boolean monitorEq;
     volatile float meter;
     volatile boolean dry;
     volatile int position;
@@ -167,6 +176,7 @@ public final class MainActivity extends Activity {
         });
         Button bypass=action("A/B · 效果",false,() -> {
             dry=!dry;
+            if (graph!=null) graph.invalidate();
             ((Button)transport.findViewById(57)).setText(dry?"A/B · 原声":"A/B · 效果");
         });
         bypass.setId(57);
@@ -184,6 +194,8 @@ public final class MainActivity extends Activity {
         }
         body.removeAllViews();
         graph=null;
+        monitorEq=page==2 && effect==0;
+        eqFrame=null;
         trackName=null;
         if (page==0) home();
         else if (page==1) prep();
@@ -219,7 +231,7 @@ public final class MainActivity extends Activity {
         gap(body,12);
         body.addView(heading("人声预制",22));
         gap(body,6);
-        body.addView(label("减少底噪和房间尾音，调整清晰度与电平。",13,MUTED));
+        body.addView(label("减少底噪和房间尾音，调整清晰度。智能响度可平衡段落之间的音量。",13,MUTED));
         gap(body,12);
         shareRow(body,knob("降噪",0,0,1,"%"),knob("去混响",1,0,1,"%"));
         shareRow(body,knob("声线清晰",2,0,1,"%"),knob("智能响度",3,0,1,"%"));
@@ -365,11 +377,18 @@ public final class MainActivity extends Activity {
 
     final class EqGraph extends View {
         final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
-        final Mixer.Filter[] filters=new Mixer.Filter[6];
+        final Mixer.Filter[] filters=new Mixer.Filter[6], bandPass=new Mixer.Filter[6];
+        final double[] response=new double[2], bandResponse=new double[2];
+        final double[] bandMix=new double[6], bandScale=new double[6];
+        final Path curve=new Path();
+        final DashPathEffect dash=new DashPathEffect(new float[]{dp(4),dp(3)},0);
         int drag=-1;
         EqGraph() {
             super(MainActivity.this);
-            for (int i=0;i<6;i++) filters[i]=new Mixer.Filter();
+            for (int i=0;i<6;i++) {
+                filters[i]=new Mixer.Filter();
+                bandPass[i]=new Mixer.Filter();
+            }
             setContentDescription("六段均衡器。拖动控制点调整频率和增益。");
         }
         float left() { return dp(19); }
@@ -397,9 +416,12 @@ public final class MainActivity extends Activity {
                 c.drawText(f>=1000?(f/1000)+"k":""+f,x(f)-dp(5),bottom()+dp(16),p);
             }
             p.setColor(MUTED);
-            c.drawText("输出频谱 · EQ",left(),dp(17),p);
-            float[] bins=spectrum;
-            if (bins.length>0) {
+            EqFrame frame=eqFrame;
+            boolean liveCurve=frame!=null && frame.settings==live && !dry && !frame.original;
+            c.drawText(dry?"原声频谱 · EQ 旁路":liveCurve?"动态 EQ · 虚线为设定":"EQ 设定曲线",
+                left(),dp(17),p);
+            if (frame!=null && frame.original==dry) {
+                float[] bins=frame.bins;
                 Path path=new Path();
                 path.moveTo(left(),bottom());
                 for (int i=0;i<bins.length;i++) {
@@ -411,27 +433,15 @@ public final class MainActivity extends Activity {
                 p.setColor(0x644b9392);
                 c.drawPath(path,p);
             }
-            for (int i=0;i<6;i++) {
-                int k=10+i*6;
-                filters[i].tune((int)values[k+5],values[k],values[k+1],rate);
-            }
-            Path curve=new Path();
-            for (int i=0;i<=100;i++) {
-                float px=left()+i*(right()-left())/100;
-                double gain=1;
-                for (int b=0;b<6;b++) {
-                    int k=10+b*6;
-                    double blend=values[k+5]==0 ? 1 : (values[k+1]+18)/36;
-                    gain*=filters[b].blendedMagnitude(Math.min(hz(px),rate*.49),rate,blend);
-                }
-                float py=y((float)Math.max(-18,Math.min(18,20*Math.log10(gain+1e-8))));
-                if (i==0) curve.moveTo(px,py); else curve.lineTo(px,py);
-            }
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(dp(2));
+            drawResponse(c,values,rate,null,liveCurve?MUTED:LIME,liveCurve);
+            if (liveCurve) drawResponse(c,values,rate,frame.gains,LIME,false);
+            p.setTextSize(dp(10));
             p.setColor(LIME);
-            c.drawPath(curve,p);
-            p.setStyle(Paint.Style.FILL);
+            if (liveCurve) {
+                p.setTextAlign(Paint.Align.RIGHT);
+                c.drawText(fmt("%+.1f dB",frame.gains[band]),right(),getHeight()-dp(4),p);
+                p.setTextAlign(Paint.Align.LEFT);
+            }
             for (int i=0;i<6;i++) {
                 int k=10+i*6;
                 p.setColor(i==band?LIME:INK);
@@ -440,6 +450,41 @@ public final class MainActivity extends Activity {
                 p.setTextSize(dp(8));
                 c.drawText(""+(i+1),x(values[k])-dp(2),y(values[k+1])+dp(3),p);
             }
+        }
+        void drawResponse(Canvas c,float[] values,int rate,float[] gains,int color,boolean dashed) {
+            for (int b=0;b<6;b++) {
+                int k=10+b*6, mode=(int)values[k+5];
+                double change=gains==null?0:gains[b];
+                filters[b].tune(mode,values[k],values[k+1]+change,rate);
+                bandMix[b]=mode==0?1:(values[k+1]+18)/36;
+                bandScale[b]=mode==0?0:Mixer.amp(change)-1;
+                if (bandScale[b]!=0) bandPass[b].tune(3,values[k],0,rate);
+            }
+            curve.rewind();
+            float stop=Math.min(right(),x(rate*.49));
+            for (int i=0;i<=100;i++) {
+                float px=left()+i*(stop-left())/100;
+                double frequency=hz(px), magnitude=1;
+                for (int b=0;b<6;b++) {
+                    filters[b].response(frequency,rate,response);
+                    double real=1+(response[0]-1)*bandMix[b], imag=response[1]*bandMix[b];
+                    if (bandScale[b]!=0) {
+                        bandPass[b].response(frequency,rate,bandResponse);
+                        real+=bandScale[b]*bandResponse[0];
+                        imag+=bandScale[b]*bandResponse[1];
+                    }
+                    magnitude*=real*real+imag*imag;
+                }
+                float py=y((float)Math.max(-18,Math.min(18,10*Math.log10(magnitude+1e-12))));
+                if (i==0) curve.moveTo(px,py); else curve.lineTo(px,py);
+            }
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(dp(dashed?1:2));
+            p.setPathEffect(dashed?dash:null);
+            p.setColor(color);
+            c.drawPath(curve,p);
+            p.setPathEffect(null);
+            p.setStyle(Paint.Style.FILL);
         }
         @Override public boolean onTouchEvent(MotionEvent e) {
             switch(e.getActionMasked()) {
@@ -577,7 +622,8 @@ public final class MainActivity extends Activity {
         playback=null;
         if (old!=null) old.cancelled=true;
         meter=0;
-        spectrum=new float[0];
+        eqFrame=null;
+        if (graph!=null) graph.invalidate();
         if (play!=null) refresh();
     }
     String clock(int frames,int rate) {
@@ -599,7 +645,6 @@ public final class MainActivity extends Activity {
     final Runnable tick=new Runnable() {
         @Override public void run() {
             refresh();
-            if (graph!=null && playback!=null) graph.invalidate();
             root.postDelayed(this,85);
         }
     };
@@ -638,7 +683,8 @@ public final class MainActivity extends Activity {
                 }
                 track.play();
                 int offset=startFrame*file.channels;
-                int tail=0, blocks=0;
+                int tail=0, untilFrame=0;
+                Spectrum analyzer=new Spectrum(file.rate);
                 for (int i=0;i<6;i++) if (live.values[12+i*6]>0) tail=file.rate*3/4*file.channels;
                 if (dry) tail=0;
                 while (!cancelled && offset<file.samples.length+tail) {
@@ -648,31 +694,29 @@ public final class MainActivity extends Activity {
                         count=Math.min(buffer.length,file.samples.length+tail-offset);
                         java.util.Arrays.fill(buffer,0,count,0f);
                     }
-                    mixer.process(buffer,count,live);
+                    Mixer.Settings active=live;
+                    mixer.process(buffer,count,active);
                     boolean original=dry;
                     float peak=0;
                     for (int i=0;i<count;i++) {
                         output[i]=original?(offset+i<file.samples.length?file.samples[offset+i]:0):AudioFile.quantize(buffer[i]);
                         peak=Math.max(peak,Math.abs(output[i]/32768f));
                     }
-                    if (++blocks%7==0) {
-                        float[] display=new float[36];
-                        int frames=count/file.channels;
-                        for (int bin=0;bin<display.length;bin++) {
-                            double frequency=20*Math.pow(1000,bin/(display.length-1.0));
-                            if (frequency>=file.rate*.48) continue;
-                            double theta=2*Math.PI*frequency/file.rate, factor=2*Math.cos(theta);
-                            double last=0, prior=0;
-                            for (int i=0;i<frames;i++) {
-                                double mid=0;
-                                for (int c=0;c<file.channels;c++) mid+=output[i*file.channels+c]/32768.0;
-                                double next=mid/file.channels+factor*last-prior;
-                                prior=last; last=next;
-                            }
-                            double energy=Math.sqrt(Math.max(0,last*last+prior*prior-factor*last*prior));
-                            display[bin]=(float)Math.max(0,Math.min(1,1+20*Math.log10(energy/frames+1e-7)/65));
+                    if (monitorEq) {
+                        analyzer.add(output,count,file.channels,original);
+                        untilFrame-=count/file.channels;
+                        if (untilFrame<=0 && !cancelled) {
+                            untilFrame+=file.rate/30;
+                            EqFrame next=new EqFrame(active,analyzer.read(),mixer.dynamicGains(),original);
+                            runOnUiThread(() -> {
+                                if (playback!=this || !monitorEq) return;
+                                eqFrame=next;
+                                if (graph!=null) graph.postInvalidateOnAnimation();
+                            });
                         }
-                        if (!cancelled) spectrum=display;
+                    } else {
+                        analyzer.reset();
+                        untilFrame=0;
                     }
                     int written=track.write(output,0,count,AudioTrack.WRITE_BLOCKING);
                     if (written!=count) throw new IOException("音频输出中断");
