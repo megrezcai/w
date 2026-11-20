@@ -1,0 +1,32 @@
+# 声场 QuickMix · Android
+
+适用于 Android 8.0（API 26）及以上。在手机上为一段录音做人声处理、均衡、压缩和染色。音频和参数均在设备上处理，应用无需联网。
+
+[下载已签名的 QuickMix 1.0.0 APK](../downloads/QuickMix-1.0.0.apk)
+
+## 使用方法
+
+1. **主界面 → 导入音频**。选择单声道或立体声的 WAV、MP3、M4A 或其他系统能解码的音频。一轮处理一段素材，建议导入短录音。解码 PCM 上限为 24 MiB（48 kHz、16 位立体声约 2 分 11 秒）。
+2. **试听**按钮在每个页面底部。用进度条跳转，点 A/B 在原声与处理效果之间切换。旋钮可上下或左右拖动，试听期间调整会实时生效。
+3. **预制**包含自适应降噪、混响尾音抑制、清晰度和自动电平。清晰度针对语音存在感频段做提升，智能响度按照音量包络补偿。
+4. **混音 → EQ** 显示输出频谱和静态滤波曲线。六个频段的初始中心为 70、160、400、1000、3000 和 8500 Hz。选中左侧频点后，横拖调频率，竖拖调峰值增益或高通／低通的强度。右侧可选滤波模式，设置频段混响、动态触发阈值和带正负号的动态幅度。阈值指该频段检测信号的均方根电平。0 dB 动态幅度关闭该频段动态处理。
+5. **混音 → 压缩器**提供细节提升、阈值、Attack 和 Release。细节旋钮同时调节压缩比及补偿，双声道联动以稳定声像。**染色**提供软饱和与输出增益，末端限峰在约 −0.18 dBFS。
+6. 回 **主界面** 保存一组本机可复用的参数，或点 **导出 WAV** 保存 16 位 PCM。导出应用当前效果参数，保留源采样率和声道数。含频段混响时附加 0.75 秒尾音。
+
+预制使用轻量 DSP，效果取决于素材。重叠人声、持续强噪声、长混响和录音削顶的修复能力有限。
+
+## 构建
+
+需要 JDK 17+、Android SDK Platform 35、Build Tools 35.0.0、Bash 和 zip。在此目录运行：
+
+```sh
+export ANDROID_SDK_ROOT=/path/to/android/sdk
+./build.sh
+```
+
+输出为 `build/QuickMix.apk`。脚本默认生成本地测试签名。用已有签名构建时，设置 `QUICKMIX_KEYSTORE`、`QUICKMIX_KEY_ALIAS` 和 `QUICKMIX_KEY_PASSWORD`。Android 需要相同签名才能覆盖更新已安装的同包名版本。
+
+## 实现参考
+
+- 双二阶滤波器系数沿用 Audio EQ Cookbook 的数字滤波器形式。[W3C Audio EQ Cookbook](https://www.w3.org/TR/audio-eq-cookbook/)
+- 压缩器采用前馈电平检测、软拐点、独立 Attack/Release 和增益平滑。[Giannoulis 等，Digital Dynamic Range Compressor Design](https://doi.org/10.17743/jaes.2012.0034)
